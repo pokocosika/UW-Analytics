@@ -1,5 +1,7 @@
 import { searchPolicy } from './policyLookup.js';
 import { createAssignment, deleteAssignment, getAssignments, searchAssignment, updateAssignment, DEFAULT_WEIGHT_RULES, loadWeightRules, saveWeightRules } from './assignmentService.js';
+import { getSummary } from './workloadEngine.js';
+import { renderWorkloadCharts } from './charts.js';
 
 let activeAssignmentId = null;
 let weightRules = { ...DEFAULT_WEIGHT_RULES };
@@ -129,6 +131,25 @@ async function refreshHistory() {
   }
 
   renderHistory(assignments);
+  await refreshWorkloadDashboard();
+}
+
+async function refreshWorkloadDashboard() {
+  const summary = await getSummary();
+  const body = document.getElementById('workload-summary-body');
+  if (body) {
+    body.innerHTML = summary.map((item) => `
+      <tr class="border-b border-[var(--border)]">
+        <td class="p-2 text-white">${item.uw}</td>
+        <td class="p-2">${item.capacity}</td>
+        <td class="p-2">${item.currentWeight}</td>
+        <td class="p-2">${item.remaining}</td>
+        <td class="p-2">${item.percentage}%</td>
+        <td class="p-2">${item.status}</td>
+      </tr>
+    `).join('');
+  }
+  renderWorkloadCharts(summary);
 }
 
 async function populatePolicyDetails(appNo) {

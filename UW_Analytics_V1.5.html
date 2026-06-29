@@ -1213,6 +1213,39 @@ input, select, button {
             </div>
 
             <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface2)] p-4 mt-6">
+                <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Workload Dashboard</div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                    <div class="rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-3">
+                        <div class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-3">UW Capacity Summary</div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs text-[var(--text-muted)]">
+                                <thead>
+                                    <tr class="border-b border-[var(--border)]">
+                                        <th class="p-2">UW</th>
+                                        <th class="p-2">Capacity</th>
+                                        <th class="p-2">Current Weight</th>
+                                        <th class="p-2">Remaining</th>
+                                        <th class="p-2">%</th>
+                                        <th class="p-2">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="workload-summary-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-3">
+                        <div class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-3">Distribution</div>
+                        <div class="h-[220px] relative">
+                            <canvas id="workload-bar-chart"></canvas>
+                        </div>
+                        <div class="h-[220px] relative mt-3">
+                            <canvas id="workload-pie-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface2)] p-4 mt-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-3">
                     <div>
                         <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Assignment History</div>
