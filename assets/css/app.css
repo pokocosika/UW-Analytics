@@ -1,0 +1,20 @@
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #0d0f14;
+  color: #e8eaf0;
+}
+
+#assign-status[data-variant='success'] { color: #34d399; }
+#assign-status[data-variant='warning'] { color: #f59e0b; }
+#assign-status[data-variant='error'] { color: #f87171; }
+#assign-status[data-variant='info'] { color: #9ca3af; }
+
+.assign-panel {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  background: rgba(19, 22, 30, 0.95);
+  padding: 20px;
+}

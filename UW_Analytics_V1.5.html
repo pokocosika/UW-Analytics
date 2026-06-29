@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="[https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js](https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js)"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/app.css">
     <style>
         :root {
             --bg: #0d0f14;
@@ -906,6 +907,7 @@ input, select, button {
             <div class="nav-tabs">
                 <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
 		<button class="tab-btn " onclick="switchTab('tracking')">ติดตามเอกสารต้นฉบับ</button>
+		<button class="tab-btn " onclick="switchTab('assign')">Assign</button>
             </div>
         </div>
     </nav>
@@ -1123,10 +1125,40 @@ input, select, button {
         </div>
     </div>
 
+    <div id="tab-assign" class="tab-content hidden">
+        <div class="assign-panel">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-white">UW Assignment Workspace</h2>
+                    <p class="text-xs text-[var(--text-muted)] mt-1">Foundation-ready assignment flow with IndexedDB persistence and policy lookup.</p>
+                </div>
+                <div class="w-full lg:w-96">
+                    <label class="text-xs font-medium text-[var(--text-muted)] block mb-1.5">Application No.</label>
+                    <div class="flex gap-2">
+                        <input id="assign-policy-search" type="text" class="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[var(--accent)]" placeholder="Search policy by application number">
+                        <button id="assign-policy-search-btn" class="bg-[var(--accent)] hover:bg-[var(--accent2)] text-[var(--bg)] px-3 py-2 rounded-xl text-xs font-semibold transition-all">Lookup</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface2)] p-4">
+                    <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Matched Policy</div>
+                    <div id="assign-policy-result" class="mt-3 text-sm text-[var(--text-muted)]">Search for a policy to begin the assignment workflow.</div>
+                </div>
+                <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface2)] p-4">
+                    <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Assignment Queue</div>
+                    <div id="assign-queue-list" class="mt-3 space-y-2"></div>
+                </div>
+            </div>
+
+            <div id="assign-status" class="mt-4 text-sm" data-variant="info">Assignment foundation ready.</div>
+        </div>
+    </div>
 
 </div>
 
-   
+    <script type="module" src="./assets/js/app.js"></script>
     <script>
 
         let policyData = [];
