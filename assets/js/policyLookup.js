@@ -1,5 +1,21 @@
 let policyCache = null;
 
+function getRowValue(row, aliases) {
+  const normalized = Object.keys(row).reduce((accumulator, key) => {
+    accumulator[key.toLowerCase()] = row[key];
+    return accumulator;
+  }, {});
+
+  for (const alias of aliases) {
+    const candidate = normalized[String(alias).toLowerCase()];
+    if (candidate !== undefined && candidate !== null && String(candidate).trim() !== '') {
+      return String(candidate).trim();
+    }
+  }
+
+  return '';
+}
+
 function normalizeAppNo(rawValue) {
   const value = String(rawValue || '').trim();
   if (!value) return '';
@@ -54,15 +70,16 @@ export async function loadPolicies(source = './file-policy.csv') {
   const text = await response.text();
   const rows = parseCsv(text);
   const normalizedPolicies = rows.map((row) => ({
-    appNo: normalizeAppNo(row.appNo || row['Application No'] || row['Policy No'] || ''),
-    customerName: row.customerName || row['Customer Name'] || row['ชื่อ - นามสกุล ผอป.'] || '',
-    plan: row.plan || row['Plan'] || '',
-    submissionDate: row.submissionDate || row['Submission Date'] || '',
-    workType: row.workType || row['Work Type'] || '',
-    weight: row.weight || row['Weight'] || 0,
-    assignedUW: row.assignedUW || row['Assigned UW'] || '',
-    batch: row.batch || row['Batch'] || '',
-    status: row.status || row['Status'] || 'pending',
+    appNo: normalizeAppNo(getRowValue(row, ['appNo', 'application no', 'policy no', 'p1apno'])),
+    customerName: getRowValue(row, ['customerName', 'customer name', 'name', 'p1fnam', 'p1snam', 'ชื่อ - นามสกุล ผอป.']),
+    idCard: getRowValue(row, ['idCard', 'id card', 'citizen id', 'cid']),
+    plan: getRowValue(row, ['plan', 'p1plan']),
+    submissionDate: getRowValue(row, ['submissionDate', 'submission date', 'p1smdt']),
+    workType: getRowValue(row, ['workType', 'work type']),
+    weight: getRowValue(row, ['weight', 'weight', 'p1fyp']) || 0,
+    assignedUW: getRowValue(row, ['assignedUW', 'assigned uw']),
+    batch: getRowValue(row, ['batch', 'batch']),
+    status: getRowValue(row, ['status', 'p1stat']) || 'pending',
   }));
 
   policyCache = normalizedPolicies;

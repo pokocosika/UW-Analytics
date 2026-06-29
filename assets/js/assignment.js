@@ -9,6 +9,7 @@ export class Assignment {
     this.assignmentId = payload.assignmentId || createId('ASSIGN');
     this.appNo = payload.appNo || '';
     this.customerName = payload.customerName || '';
+    this.idCard = payload.idCard || '';
     this.plan = payload.plan || '';
     this.submissionDate = payload.submissionDate || '';
     this.workType = payload.workType || '';
