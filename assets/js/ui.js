@@ -1,6 +1,6 @@
 import { searchPolicy } from './policyLookup.js';
 import { createAssignment, deleteAssignment, getAssignments, searchAssignment, updateAssignment, DEFAULT_WEIGHT_RULES, loadWeightRules, saveWeightRules } from './assignmentService.js';
-import { getSummary } from './workloadEngine.js';
+import { getSummary, getRemainingCapacity } from './workloadEngine.js';
 import { renderWorkloadCharts } from './charts.js';
 import { validateAssignment } from './businessRulesEngine.js';
 
@@ -84,7 +84,7 @@ function getFormValues() {
 
 async function refreshBusinessRuleStatus(values = null) {
   const formValues = values || getFormValues();
-  const result = await validateAssignment({
+  const businessResult = await validateAssignment({
     ...formValues,
     weight: formValues.weight || undefined,
   }).catch(() => ({
@@ -96,6 +96,62 @@ async function refreshBusinessRuleStatus(values = null) {
     calculatedWeight: Number(formValues.weight) || 0,
     allowedUW: [],
   }));
+
+  const requiredErrors = [];
+  const requiredWarnings = [];
+  const appNo = String(formValues.appNo || '').trim();
+  const customerName = String(formValues.customerName || '').trim();
+  const workType = String(formValues.workType || '').trim();
+  const assignedUW = String(formValues.assignedUW || '').trim().toUpperCase();
+  const weight = Number(formValues.weight) || businessResult.calculatedWeight || 0;
+
+  if (!appNo) {
+    requiredErrors.push('Application number is required.');
+  }
+  if (!customerName) {
+    requiredErrors.push('Customer name is required.');
+  }
+  if (!workType) {
+    requiredErrors.push('Work type is required.');
+  }
+  if (!assignedUW) {
+    requiredErrors.push('Assigned UW is required.');
+  }
+
+  if (!weight) {
+    requiredWarnings.push('Weight is empty; the default work-type weight will be used.');
+  }
+
+  if (appNo) {
+    const assignments = await getAssignments();
+    const duplicate = assignments.find((assignment) => {
+      if (assignment.assignmentId === activeAssignmentId) return false;
+      return String(assignment.appNo || '').trim().toLowerCase() === appNo.toLowerCase();
+    });
+
+    if (duplicate) {
+      requiredErrors.push(`Duplicate application number ${appNo} already exists.`);
+    }
+  }
+
+  if (assignedUW) {
+    const remainingCapacity = await getRemainingCapacity(assignedUW);
+    if (remainingCapacity < weight) {
+      requiredErrors.push(`UW ${assignedUW} does not have enough remaining capacity (${remainingCapacity} available, ${weight} required).`);
+    } else if (remainingCapacity === 0) {
+      requiredWarnings.push(`UW ${assignedUW} is currently at full capacity.`);
+    }
+  }
+
+  const result = {
+    status: requiredErrors.length ? 'error' : businessResult.status === 'error' ? 'error' : businessResult.status === 'warning' || requiredWarnings.length ? 'warning' : 'valid',
+    reason: requiredErrors[0] || businessResult.reason || 'Assignment is ready to save.',
+    errors: [...(businessResult.errors || []), ...requiredErrors],
+    warnings: [...(businessResult.warnings || []), ...requiredWarnings],
+    appliedRules: businessResult.appliedRules || [],
+    calculatedWeight: weight,
+    allowedUW: businessResult.allowedUW || [],
+  };
 
   renderBusinessRuleStatus(result);
   return result;
@@ -339,6 +395,7 @@ export function setupAssignTab() {
       if (workTypeSelect && weightInput) {
         weightInput.value = calculateWeight(workTypeSelect.value);
       }
+      void refreshBusinessRuleStatus();
       updateAssignStatus('Form reset.', 'info');
     });
   }
