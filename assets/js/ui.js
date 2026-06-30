@@ -3,6 +3,7 @@ import { createAssignment, deleteAssignment, getAssignments, searchAssignment, u
 import { getSummary, getRemainingCapacity } from './workloadEngine.js';
 import { renderWorkloadCharts } from './charts.js';
 import { validateAssignment } from './businessRulesEngine.js';
+import { exportAssignmentWorkbooks } from './exportEngine.js';
 
 let activeAssignmentId = null;
 let weightRules = { ...DEFAULT_WEIGHT_RULES };
@@ -13,6 +14,15 @@ function updateAssignStatus(message, variant = 'info') {
 
   statusNode.textContent = message;
   statusNode.dataset.variant = variant;
+}
+
+async function handleExportAssignments() {
+  try {
+    const result = await exportAssignmentWorkbooks();
+    updateAssignStatus(`Exported ${result.assignmentsCount} assignments to Excel.`, 'success');
+  } catch (error) {
+    updateAssignStatus(error.message || 'Unable to export assignments.', 'error');
+  }
 }
 
 function renderBusinessRuleStatus(result = null) {
@@ -297,6 +307,7 @@ export function setupAssignTab() {
   const historySearch = document.getElementById('assign-history-search');
   const historySort = document.getElementById('assign-history-sort');
   const resetButton = document.getElementById('assign-reset-btn');
+  const exportButton = document.getElementById('assign-export-btn');
 
   const syncAppNo = (value) => {
     if (appNoInput) appNoInput.value = value;
@@ -397,6 +408,12 @@ export function setupAssignTab() {
       }
       void refreshBusinessRuleStatus();
       updateAssignStatus('Form reset.', 'info');
+    });
+  }
+
+  if (exportButton) {
+    exportButton.addEventListener('click', () => {
+      void handleExportAssignments();
     });
   }
 
