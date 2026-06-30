@@ -1,0 +1,38 @@
+{
+  "teleSale": {
+    "label": "Tele Sale",
+    "keywords": ["Tele Sale", "tele sale", "TeleSale"],
+    "severity": "warning",
+    "reason": "Tele Sale should be reviewed for voice compliance."
+  },
+  "internetSale": {
+    "label": "Internet Sale",
+    "keywords": ["Internet Sale", "internet sale"],
+    "severity": "warning",
+    "reason": "Internet Sale should be checked for digital submission requirements."
+  },
+  "rabbitSpecialPlan": {
+    "label": "Rabbit Special Plan",
+    "keywords": ["Rabbit Special Plan", "Rabbit"],
+    "severity": "warning",
+    "reason": "Rabbit Special Plan requires extra review for special-handling policy cases."
+  },
+  "voiceFile": {
+    "label": "Voice File",
+    "keywords": ["Voice File", "Voice"],
+    "severity": "warning",
+    "reason": "Voice files should be routed to an underwriter that can review voice."
+  },
+  "manualReview": {
+    "label": "Manual Review",
+    "keywords": ["Manual Review", "Manual"],
+    "severity": "warning",
+    "reason": "Manual review is required for this case."
+  },
+  "priorityCase": {
+    "label": "Priority Case",
+    "keywords": ["Priority", "Priority Case"],
+    "severity": "warning",
+    "reason": "Priority case flagged for expedited review."
+  }
+}

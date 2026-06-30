@@ -1,0 +1,24 @@
+{
+  "teleSale": {
+    "voiceReviewBy": "TP",
+    "weight": 1
+  },
+  "medical": {
+    "weight": 3
+  },
+  "memo": {
+    "weight": 1
+  },
+  "tss": {
+    "weight": 2
+  },
+  "claim": {
+    "weight": 10
+  },
+  "internetSale": {
+    "weight": 1
+  },
+  "voice": {
+    "weight": 1
+  }
+}

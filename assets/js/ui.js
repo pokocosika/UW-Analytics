@@ -2,6 +2,7 @@ import { searchPolicy } from './policyLookup.js';
 import { createAssignment, deleteAssignment, getAssignments, searchAssignment, updateAssignment, DEFAULT_WEIGHT_RULES, loadWeightRules, saveWeightRules } from './assignmentService.js';
 import { getSummary } from './workloadEngine.js';
 import { renderWorkloadCharts } from './charts.js';
+import { validateAssignment } from './businessRulesEngine.js';
 
 let activeAssignmentId = null;
 let weightRules = { ...DEFAULT_WEIGHT_RULES };
@@ -12,6 +13,45 @@ function updateAssignStatus(message, variant = 'info') {
 
   statusNode.textContent = message;
   statusNode.dataset.variant = variant;
+}
+
+function renderBusinessRuleStatus(result = null) {
+  const container = document.getElementById('business-rule-status');
+  if (!container) return;
+
+  if (!result) {
+    container.innerHTML = `
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Business Rule Status</div>
+      <div class="mt-2 rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-1 text-[11px] text-[var(--text-muted)]">No validation run yet</div>
+    `;
+    return;
+  }
+
+  const appliedRules = (result.appliedRules || []).map((rule) => `<li class="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text-muted)]">${rule.name}${rule.weight ? ` · weight ${rule.weight}` : ''}</li>`).join('');
+  const warnings = (result.warnings || []).map((warning) => `<li class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">${warning}</li>`).join('');
+  const errors = (result.errors || []).map((error) => `<li class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-200">${error}</li>`).join('');
+
+  const badgeClass = result.status === 'error' ? 'border-rose-500/40 bg-rose-500/10 text-rose-200' : result.status === 'warning' ? 'border-amber-500/40 bg-amber-500/10 text-amber-200' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+
+  container.innerHTML = `
+    <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Business Rule Status</div>
+    <div class="mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${badgeClass}">${result.status === 'error' ? 'Error' : result.status === 'warning' ? 'Warning' : 'Valid'}</div>
+    <p class="mt-2 text-[11px] text-[var(--text-muted)]">${result.reason || 'No additional guidance.'}</p>
+    <div class="mt-3 space-y-2">
+      <div>
+        <div class="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Applied Rules</div>
+        <ul class="mt-1 space-y-1">${appliedRules || '<li class="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text-muted)]">No rules applied.</li>'}</ul>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Warnings</div>
+        <ul class="mt-1 space-y-1">${warnings || '<li class="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text-muted)]">None</li>'}</ul>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Errors</div>
+        <ul class="mt-1 space-y-1">${errors || '<li class="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text-muted)]">None</li>'}</ul>
+      </div>
+    </div>
+  `;
 }
 
 function setFormValues(values) {
@@ -40,6 +80,25 @@ function getFormValues() {
   });
   return values;
 
+}
+
+async function refreshBusinessRuleStatus(values = null) {
+  const formValues = values || getFormValues();
+  const result = await validateAssignment({
+    ...formValues,
+    weight: formValues.weight || undefined,
+  }).catch(() => ({
+    status: 'warning',
+    reason: 'Business rules could not be loaded. Using fallback validation.',
+    errors: [],
+    warnings: [],
+    appliedRules: [],
+    calculatedWeight: Number(formValues.weight) || 0,
+    allowedUW: [],
+  }));
+
+  renderBusinessRuleStatus(result);
+  return result;
 }
 
 function calculateWeight(workType) {
@@ -223,25 +282,40 @@ export function setupAssignTab() {
   }
 
   if (form) {
+    form.addEventListener('input', () => {
+      void refreshBusinessRuleStatus();
+    });
+
+    form.addEventListener('change', () => {
+      void refreshBusinessRuleStatus();
+    });
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = getFormValues();
+      const validation = await refreshBusinessRuleStatus(values);
+      if (validation.status === 'error') {
+        updateAssignStatus(validation.reason, 'error');
+        return;
+      }
+
       const payload = {
         ...values,
-        weight: Number(values.weight) || calculateWeight(values.workType),
+        weight: Number(values.weight) || validation.calculatedWeight || 0,
         assignmentId: activeAssignmentId || undefined,
       };
 
       try {
         if (activeAssignmentId) {
           await updateAssignment(payload);
-          updateAssignStatus('Assignment updated.', 'success');
+          updateAssignStatus(validation.reason || 'Assignment updated.', validation.status === 'warning' ? 'warning' : 'success');
         } else {
           await createAssignment(payload);
-          updateAssignStatus('Assignment saved to IndexedDB.', 'success');
+          updateAssignStatus(validation.reason || 'Assignment saved to IndexedDB.', validation.status === 'warning' ? 'warning' : 'success');
         }
         activeAssignmentId = null;
         form.reset();
+        renderBusinessRuleStatus();
         const workTypeSelect = document.getElementById('workType');
         const weightInput = document.getElementById('weight');
         if (workTypeSelect && weightInput) {
@@ -308,7 +382,9 @@ export async function initializeAssignmentUi() {
   weightRules = await loadWeightRules().catch(() => ({ ...DEFAULT_WEIGHT_RULES }));
   bindWeightRules();
   renderWeightRules();
+  renderBusinessRuleStatus();
   setupAssignTab();
   await refreshHistory();
+  await refreshBusinessRuleStatus();
   updateAssignStatus('Assignment engine ready.', 'success');
 }

@@ -1,0 +1,58 @@
+{
+  "TS": {
+    "capacity": 1,
+    "canReviewVoice": false,
+    "canMedical": false,
+    "allowedWork": ["E-App", "Memo"],
+    "priority": "standard",
+    "availability": "available"
+  },
+  "ND": {
+    "capacity": 1,
+    "canReviewVoice": false,
+    "canMedical": true,
+    "allowedWork": ["E-App", "Memo", "Medical"],
+    "priority": "standard",
+    "availability": "available"
+  },
+  "PP": {
+    "capacity": 0.5,
+    "canReviewVoice": false,
+    "canMedical": false,
+    "allowedWork": ["E-App", "Memo"],
+    "priority": "low",
+    "availability": "busy"
+  },
+  "WP": {
+    "capacity": 0.25,
+    "canReviewVoice": false,
+    "canMedical": false,
+    "allowedWork": ["E-App"],
+    "priority": "low",
+    "availability": "busy"
+  },
+  "KK": {
+    "capacity": 1,
+    "canReviewVoice": true,
+    "canMedical": true,
+    "allowedWork": ["E-App", "Memo", "Voice", "Medical"],
+    "priority": "standard",
+    "availability": "available"
+  },
+  "YD": {
+    "capacity": 1,
+    "canReviewVoice": true,
+    "canMedical": true,
+    "allowedWork": ["E-App", "Memo", "Voice", "Medical", "Claim"],
+    "priority": "standard",
+    "availability": "available"
+  },
+  "TP": {
+    "capacity": 1,
+    "canReviewVoice": true,
+    "canMedical": true,
+    "allowedWork": ["E-App", "Memo", "Voice", "Medical", "Claim"],
+    "priority": "high",
+    "availability": "available"
+  }
+}
