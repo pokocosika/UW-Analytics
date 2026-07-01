@@ -4,9 +4,11 @@ import { getSummary, getRemainingCapacity } from './workloadEngine.js';
 import { renderWorkloadCharts } from './charts.js';
 import { validateAssignment } from './businessRulesEngine.js';
 import { exportAssignmentWorkbooks } from './exportEngine.js';
+import { escapeHtml } from './assignmentUtils.js';
 
 let activeAssignmentId = null;
 let weightRules = { ...DEFAULT_WEIGHT_RULES };
+let isSubmitting = false;
 
 function updateAssignStatus(message, variant = 'info') {
   const statusNode = document.getElementById('assign-status');
@@ -14,14 +16,71 @@ function updateAssignStatus(message, variant = 'info') {
 
   statusNode.textContent = message;
   statusNode.dataset.variant = variant;
+  showToast(message, variant);
+}
+
+function showToast(message, variant = 'info') {
+  const existing = document.getElementById('uw-toast-region');
+  if (!existing) {
+    const container = document.createElement('div');
+    container.id = 'uw-toast-region';
+    container.className = 'fixed right-4 top-4 z-[200] flex flex-col gap-2';
+    document.body.appendChild(container);
+  }
+
+  const container = document.getElementById('uw-toast-region');
+  const toast = document.createElement('div');
+  const toneClass = variant === 'success' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : variant === 'warning' ? 'border-amber-500/40 bg-amber-500/10 text-amber-200' : variant === 'error' ? 'border-rose-500/40 bg-rose-500/10 text-rose-200' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text)]';
+  toast.className = `min-w-[240px] max-w-[320px] rounded-xl border px-3 py-2 text-sm shadow-lg backdrop-blur ${toneClass}`;
+  toast.innerHTML = `<div class="font-semibold">${escapeHtml(message)}</div>`;
+  container.appendChild(toast);
+
+  window.setTimeout(() => {
+    toast.remove();
+    if (!container.children.length) {
+      container.remove();
+    }
+  }, 2800);
+}
+
+function setBusyState(isBusy, message = '') {
+  const form = document.getElementById('assignment-form');
+  const submitButton = form?.querySelector('button[type="submit"]');
+  const exportButton = document.getElementById('assign-export-btn');
+  const resetButton = document.getElementById('assign-reset-btn');
+  const historySearch = document.getElementById('assign-history-search');
+  const historySort = document.getElementById('assign-history-sort');
+  const loadingIndicator = document.getElementById('assign-loading-indicator');
+
+  if (submitButton) {
+    submitButton.disabled = isBusy;
+    submitButton.classList.toggle('opacity-60', isBusy);
+    submitButton.textContent = isBusy ? (message || 'Saving…') : 'Save Assignment';
+  }
+
+  if (exportButton) { exportButton.disabled = isBusy; exportButton.classList.toggle('opacity-60', isBusy); }
+  if (resetButton) { resetButton.disabled = isBusy; resetButton.classList.toggle('opacity-60', isBusy); }
+  if (historySearch) { historySearch.disabled = isBusy; }
+  if (historySort) { historySort.disabled = isBusy; }
+  if (loadingIndicator) {
+    loadingIndicator.classList.toggle('hidden', !isBusy);
+    loadingIndicator.classList.toggle('flex', isBusy);
+    const label = loadingIndicator.querySelector('span:last-child');
+    if (label) {
+      label.textContent = isBusy ? (message || 'Working…') : 'Ready';
+    }
+  }
 }
 
 async function handleExportAssignments() {
   try {
+    setBusyState(true, 'Exporting…');
     const result = await exportAssignmentWorkbooks();
-    updateAssignStatus(`Exported ${result.assignmentsCount} assignments to Excel.`, 'success');
+    updateAssignStatus(`Export completed: ${result.assignmentsCount} assignments exported.`, 'success');
   } catch (error) {
     updateAssignStatus(error.message || 'Unable to export assignments.', 'error');
+  } finally {
+    setBusyState(false);
   }
 }
 
@@ -37,16 +96,16 @@ function renderBusinessRuleStatus(result = null) {
     return;
   }
 
-  const appliedRules = (result.appliedRules || []).map((rule) => `<li class="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text-muted)]">${rule.name}${rule.weight ? ` · weight ${rule.weight}` : ''}</li>`).join('');
-  const warnings = (result.warnings || []).map((warning) => `<li class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">${warning}</li>`).join('');
-  const errors = (result.errors || []).map((error) => `<li class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-200">${error}</li>`).join('');
+  const appliedRules = (result.appliedRules || []).map((rule) => `<li class="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text-muted)]">${escapeHtml(rule.name)}${rule.weight ? ` · weight ${escapeHtml(rule.weight)}` : ''}</li>`).join('');
+  const warnings = (result.warnings || []).map((warning) => `<li class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">${escapeHtml(warning)}</li>`).join('');
+  const errors = (result.errors || []).map((error) => `<li class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-200">${escapeHtml(error)}</li>`).join('');
 
   const badgeClass = result.status === 'error' ? 'border-rose-500/40 bg-rose-500/10 text-rose-200' : result.status === 'warning' ? 'border-amber-500/40 bg-amber-500/10 text-amber-200' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
 
   container.innerHTML = `
     <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Business Rule Status</div>
     <div class="mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${badgeClass}">${result.status === 'error' ? 'Error' : result.status === 'warning' ? 'Warning' : 'Valid'}</div>
-    <p class="mt-2 text-[11px] text-[var(--text-muted)]">${result.reason || 'No additional guidance.'}</p>
+    <p class="mt-2 text-[11px] text-[var(--text-muted)]">${escapeHtml(result.reason || 'No additional guidance.')}</p>
     <div class="mt-3 space-y-2">
       <div>
         <div class="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Applied Rules</div>
@@ -223,67 +282,79 @@ function renderHistory(assignments) {
     return;
   }
 
-  listNode.innerHTML = assignments.map((assignment) => `
-    <tr class="border-b border-[var(--border)] text-xs text-[var(--text-muted)]">
-      <td class="p-3 text-white">${assignment.appNo || '—'}</td>
-      <td class="p-3">
-        <div class="font-medium text-white">${assignment.customerName || '—'}</div>
-        ${assignment.policyNo || assignment.product ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">${[assignment.policyNo ? `Policy No: ${assignment.policyNo}` : '', assignment.product ? `Product: ${assignment.product}` : ''].filter(Boolean).join(' • ')}</div>` : ''}
-      </td>
-      <td class="p-3">${assignment.workType || '—'}</td>
-      <td class="p-3">${assignment.weight || 0}</td>
-      <td class="p-3">
-        <div>${assignment.assignedUW || '—'}</div>
-        ${assignment.assignedBy ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">By ${assignment.assignedBy}</div>` : ''}
-      </td>
-      <td class="p-3">${assignment.batch || '—'}</td>
-      <td class="p-3">
-        <div>${assignment.status || 'pending'}</div>
-        ${assignment.lastModified ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">${new Date(assignment.lastModified).toLocaleString()}</div>` : ''}
-      </td>
-      <td class="p-3 flex gap-2">
-        <button data-action="edit" data-id="${assignment.assignmentId}" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[11px] text-white">Edit</button>
-        <button data-action="delete" data-id="${assignment.assignmentId}" class="rounded-lg border border-rose-500/40 px-2 py-1 text-[11px] text-rose-300">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  listNode.innerHTML = assignments.map((assignment) => {
+    const policyMeta = [assignment.policyNo ? `Policy No: ${escapeHtml(assignment.policyNo)}` : '', assignment.product ? `Product: ${escapeHtml(assignment.product)}` : ''].filter(Boolean).join(' • ');
+    const lastModified = assignment.lastModified ? new Date(assignment.lastModified).toLocaleString() : '';
+    return `
+      <tr class="border-b border-[var(--border)] text-xs text-[var(--text-muted)]">
+        <td class="p-3 text-white">${escapeHtml(assignment.appNo || '—')}</td>
+        <td class="p-3">
+          <div class="font-medium text-white">${escapeHtml(assignment.customerName || '—')}</div>
+          ${policyMeta ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">${escapeHtml(policyMeta)}</div>` : ''}
+        </td>
+        <td class="p-3">${escapeHtml(assignment.workType || '—')}</td>
+        <td class="p-3">${escapeHtml(assignment.weight || 0)}</td>
+        <td class="p-3">
+          <div>${escapeHtml(assignment.assignedUW || '—')}</div>
+          ${assignment.assignedBy ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">By ${escapeHtml(assignment.assignedBy)}</div>` : ''}
+        </td>
+        <td class="p-3">${escapeHtml(assignment.batch || '—')}</td>
+        <td class="p-3">
+          <div>${escapeHtml(assignment.status || 'pending')}</div>
+          ${lastModified ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">${escapeHtml(lastModified)}</div>` : ''}
+        </td>
+        <td class="p-3 flex gap-2">
+          <button data-action="edit" data-id="${escapeHtml(assignment.assignmentId || '')}" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[11px] text-white">Edit</button>
+          <button data-action="delete" data-id="${escapeHtml(assignment.assignmentId || '')}" class="rounded-lg border border-rose-500/40 px-2 py-1 text-[11px] text-rose-300">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function refreshHistory() {
   const query = document.getElementById('assign-history-search')?.value || '';
   const sort = document.getElementById('assign-history-sort')?.value || 'newest';
-  let assignments = await searchAssignment(query);
+  try {
+    let assignments = await searchAssignment(query);
 
-  assignments = [...assignments].sort((a, b) => {
-    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
-    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
-    return dateB - dateA;
-  });
+    assignments = [...assignments].sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
 
-  if (sort === 'oldest') {
-    assignments.reverse();
+    if (sort === 'oldest') {
+      assignments.reverse();
+    }
+
+    renderHistory(assignments);
+    await refreshWorkloadDashboard();
+  } catch (error) {
+    updateAssignStatus(error.message || 'Unable to refresh assignment history.', 'error');
   }
-
-  renderHistory(assignments);
-  await refreshWorkloadDashboard();
 }
 
 async function refreshWorkloadDashboard() {
-  const summary = await getSummary();
-  const body = document.getElementById('workload-summary-body');
-  if (body) {
-    body.innerHTML = summary.map((item) => `
-      <tr class="border-b border-[var(--border)]">
-        <td class="p-2 text-white">${item.uw}</td>
-        <td class="p-2">${item.capacity}</td>
-        <td class="p-2">${item.currentWeight}</td>
-        <td class="p-2">${item.remaining}</td>
-        <td class="p-2">${item.percentage}%</td>
-        <td class="p-2">${item.status}</td>
-      </tr>
-    `).join('');
+  try {
+    const summary = await getSummary();
+    const body = document.getElementById('workload-summary-body');
+    if (body) {
+      body.innerHTML = summary.map((item) => `
+        <tr class="border-b border-[var(--border)]">
+          <td class="p-2 text-white">${escapeHtml(item.uw)}</td>
+          <td class="p-2">${escapeHtml(item.capacity)}</td>
+          <td class="p-2">${escapeHtml(item.currentWeight)}</td>
+          <td class="p-2">${escapeHtml(item.remaining)}</td>
+          <td class="p-2">${escapeHtml(item.percentage)}%</td>
+          <td class="p-2">${escapeHtml(item.status)}</td>
+        </tr>
+      `).join('');
+    }
+    renderWorkloadCharts(summary);
+  } catch (error) {
+    console.warn('Workload dashboard refresh failed:', error);
   }
-  renderWorkloadCharts(summary);
 }
 
 async function populatePolicyDetails(appNo) {
@@ -368,32 +439,36 @@ export function setupAssignTab() {
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = getFormValues();
-      const validation = await refreshBusinessRuleStatus(values);
-      if (validation.status === 'error') {
-        updateAssignStatus(validation.reason, 'error');
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const payload = {
-        ...values,
-        policyNo: values.policyNo || values.appNo || '',
-        product: values.product || values.plan || '',
-        assignedDateTime: values.assignedDateTime || (activeAssignmentId ? undefined : now),
-        assignedBy: values.assignedBy || 'system',
-        lastModified: now,
-        weight: Number(values.weight) || validation.calculatedWeight || 0,
-        assignmentId: activeAssignmentId || undefined,
-      };
+      if (isSubmitting) return;
+      isSubmitting = true;
+      setBusyState(true, activeAssignmentId ? 'Updating…' : 'Saving…');
 
       try {
+        const values = getFormValues();
+        const validation = await refreshBusinessRuleStatus(values);
+        if (validation.status === 'error') {
+          updateAssignStatus(validation.reason || 'Please fix validation issues before saving.', 'error');
+          return;
+        }
+
+        const now = new Date().toISOString();
+        const payload = {
+          ...values,
+          policyNo: values.policyNo || values.appNo || '',
+          product: values.product || values.plan || '',
+          assignedDateTime: values.assignedDateTime || (activeAssignmentId ? undefined : now),
+          assignedBy: values.assignedBy || 'system',
+          lastModified: now,
+          weight: Number(values.weight) || validation.calculatedWeight || 0,
+          assignmentId: activeAssignmentId || undefined,
+        };
+
         if (activeAssignmentId) {
           await updateAssignment(payload);
           updateAssignStatus(validation.reason || 'Assignment updated.', validation.status === 'warning' ? 'warning' : 'success');
         } else {
           await createAssignment(payload);
-          updateAssignStatus(validation.reason || 'Assignment saved to LocalStorage.', validation.status === 'warning' ? 'warning' : 'success');
+          updateAssignStatus(validation.reason || 'Assignment saved.', validation.status === 'warning' ? 'warning' : 'success');
         }
         activeAssignmentId = null;
         form.reset();
@@ -407,6 +482,9 @@ export function setupAssignTab() {
         window.refreshDashboardData?.();
       } catch (error) {
         updateAssignStatus(error.message || 'Unable to save assignment.', 'error');
+      } finally {
+        isSubmitting = false;
+        setBusyState(false);
       }
     });
   }
@@ -449,10 +527,14 @@ export function setupAssignTab() {
     const assignmentId = target.getAttribute('data-id');
 
     if (action === 'delete') {
-      await deleteAssignment(assignmentId);
-      updateAssignStatus('Assignment deleted.', 'warning');
-      await refreshHistory();
-      window.refreshDashboardData?.();
+      try {
+        await deleteAssignment(assignmentId);
+        updateAssignStatus('Assignment deleted.', 'warning');
+        await refreshHistory();
+        window.refreshDashboardData?.();
+      } catch (error) {
+        updateAssignStatus(error.message || 'Unable to delete assignment.', 'error');
+      }
       return;
     }
 
@@ -464,19 +546,27 @@ export function setupAssignTab() {
     setFormValues(assignment);
     if (appNoInput) appNoInput.value = assignment.appNo || '';
     if (appNoField) appNoField.value = assignment.appNo || '';
-    document.getElementById('weight').value = assignment.weight || calculateWeight(assignment.workType);
+    const weightInput = document.getElementById('weight');
+    if (weightInput) {
+      weightInput.value = assignment.weight || calculateWeight(assignment.workType);
+    }
     updateAssignStatus('Assignment loaded for editing.', 'info');
+    await refreshBusinessRuleStatus(getFormValues());
   });
 }
 
 export async function initializeAssignmentUi() {
-  weightRules = await loadWeightRules().catch(() => ({ ...DEFAULT_WEIGHT_RULES }));
-  bindWeightRules();
-  renderWeightRules();
-  renderBusinessRuleStatus();
-  setupAssignTab();
-  await refreshHistory();
-  await refreshBusinessRuleStatus();
-  window.refreshDashboardData?.();
-  updateAssignStatus('Assignment engine ready.', 'success');
+  try {
+    weightRules = await loadWeightRules().catch(() => ({ ...DEFAULT_WEIGHT_RULES }));
+    bindWeightRules();
+    renderWeightRules();
+    renderBusinessRuleStatus();
+    setupAssignTab();
+    await refreshHistory();
+    await refreshBusinessRuleStatus();
+    window.refreshDashboardData?.();
+    updateAssignStatus('Assignment engine ready.', 'success');
+  } catch (error) {
+    updateAssignStatus(error.message || 'Assignment UI initialization failed.', 'error');
+  }
 }

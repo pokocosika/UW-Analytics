@@ -31,6 +31,25 @@ global.document = {};
 
 const { initializeStorage, getAllRecords } = await import('../assets/js/storage.js');
 const { createAssignment, updateAssignment, deleteAssignment, getAssignments } = await import('../assets/js/assignmentService.js');
+const { normalizeAssignmentPayload } = await import('../assets/js/assignmentUtils.js');
+
+test('assignment payload normalization preserves core fields', () => {
+  const normalized = normalizeAssignmentPayload({
+    appNo: 'A100',
+    customerName: 'Ada Lovelace',
+    assignedUW: 'PP',
+    workType: 'E-App',
+    weight: '2',
+    status: 'pending',
+  });
+
+  assert.equal(normalized.appNo, 'A100');
+  assert.equal(normalized.customerName, 'Ada Lovelace');
+  assert.equal(normalized.assignedUW, 'PP');
+  assert.equal(normalized.weight, 2);
+  assert.equal(normalized.status, 'pending');
+  assert.ok(normalized.assignmentId.startsWith('ASSIGN-'));
+});
 
 test('assignment CRUD persists to LocalStorage and prevents duplicates', async () => {
   await initializeStorage();

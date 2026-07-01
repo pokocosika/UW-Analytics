@@ -18,3 +18,26 @@ body {
   background: rgba(19, 22, 30, 0.95);
   padding: 20px;
 }
+
+#uw-toast-region {
+  pointer-events: none;
+}
+
+#assign-loading-indicator {
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .assign-panel {
+    padding: 16px;
+  }
+
+  #uw-toast-region {
+    left: 1rem;
+    right: 1rem;
+    top: 1rem;
+  }
+}

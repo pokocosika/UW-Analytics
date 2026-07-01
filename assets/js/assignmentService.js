@@ -1,9 +1,6 @@
 import { saveRecord, getAllRecords, getRecord, deleteRecord } from './storage.js';
 import { addAuditLog } from './assignment.js';
-
-function createId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { normalizeAssignmentPayload } from './assignmentUtils.js';
 
 export const DEFAULT_WEIGHT_RULES = {
   'E-App': 1,
@@ -17,30 +14,6 @@ export const DEFAULT_WEIGHT_RULES = {
   Claim: 10,
   APS: 5,
 };
-
-function normalizeAssignment(payload = {}) {
-  const now = new Date().toISOString();
-  return {
-    assignmentId: payload.assignmentId || createId('ASSIGN'),
-    appNo: payload.appNo || '',
-    policyNo: payload.policyNo || payload.appNo || '',
-    customerName: payload.customerName || '',
-    product: payload.product || payload.plan || '',
-    idCard: payload.idCard || '',
-    plan: payload.plan || '',
-    submissionDate: payload.submissionDate || '',
-    workType: payload.workType || '',
-    weight: Number(payload.weight) || 0,
-    assignedUW: payload.assignedUW || '',
-    assignedDateTime: payload.assignedDateTime || payload.createdAt || now,
-    assignedBy: payload.assignedBy || 'system',
-    lastModified: payload.lastModified || payload.updatedAt || payload.createdAt || now,
-    batch: payload.batch || '',
-    status: payload.status || 'pending',
-    createdAt: payload.createdAt || payload.assignedDateTime || now,
-    updatedAt: payload.updatedAt || payload.lastModified || payload.createdAt || now,
-  };
-}
 
 async function assertUniqueAssignment(assignment, ignoreAssignmentId = null) {
   const records = await getAllRecords('assignments');
@@ -59,7 +32,7 @@ async function assertUniqueAssignment(assignment, ignoreAssignmentId = null) {
 }
 
 export async function createAssignment(payload) {
-  const assignment = normalizeAssignment({ ...payload, createdAt: payload.createdAt || new Date().toISOString() });
+  const assignment = normalizeAssignmentPayload({ ...payload, createdAt: payload.createdAt || new Date().toISOString() });
   assignment.updatedAt = new Date().toISOString();
   assignment.lastModified = assignment.updatedAt;
   assignment.assignedDateTime = assignment.assignedDateTime || assignment.createdAt;
@@ -77,7 +50,7 @@ export async function updateAssignment(payload) {
     throw new Error('Assignment not found.');
   }
 
-  const updated = normalizeAssignment({ ...existing, ...payload, updatedAt: new Date().toISOString(), lastModified: new Date().toISOString() });
+  const updated = normalizeAssignmentPayload({ ...existing, ...payload, updatedAt: new Date().toISOString(), lastModified: new Date().toISOString() });
   await assertUniqueAssignment(updated, existing.assignmentId);
 
   const saved = await saveRecord('assignments', updated);

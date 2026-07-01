@@ -1,30 +1,9 @@
 import { saveRecord, getAllRecords, getRecord } from './storage.js';
-
-function createId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { createId, normalizeAssignmentPayload } from './assignmentUtils.js';
 
 export class Assignment {
   constructor(payload = {}) {
-    const now = new Date().toISOString();
-    this.assignmentId = payload.assignmentId || createId('ASSIGN');
-    this.appNo = payload.appNo || '';
-    this.policyNo = payload.policyNo || payload.appNo || '';
-    this.customerName = payload.customerName || '';
-    this.product = payload.product || payload.plan || '';
-    this.idCard = payload.idCard || '';
-    this.plan = payload.plan || '';
-    this.submissionDate = payload.submissionDate || '';
-    this.workType = payload.workType || '';
-    this.weight = Number(payload.weight) || 0;
-    this.assignedUW = payload.assignedUW || '';
-    this.assignedDateTime = payload.assignedDateTime || payload.createdAt || now;
-    this.assignedBy = payload.assignedBy || 'system';
-    this.lastModified = payload.lastModified || payload.updatedAt || this.assignedDateTime;
-    this.batch = payload.batch || '';
-    this.status = payload.status || 'pending';
-    this.createdAt = payload.createdAt || this.assignedDateTime;
-    this.updatedAt = payload.updatedAt || this.lastModified;
+    Object.assign(this, normalizeAssignmentPayload(payload));
   }
 }
 

@@ -12,6 +12,9 @@ async function bootstrap() {
     console.info('UW Analytics foundation initialized.');
   } catch (error) {
     console.error('Foundation bootstrap failed:', error);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('uw:bootstrap-error', { detail: error }));
+    }
   }
 }
 

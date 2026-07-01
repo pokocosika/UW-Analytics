@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="[https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js](https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js)"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./assets/css/app.css">
     <style>
@@ -1347,7 +1346,13 @@ input, select, button {
                 </div>
             </div>
 
-            <div id="assign-status" class="mt-4 text-sm" data-variant="info">Assignment engine ready.</div>
+            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div id="assign-status" class="text-sm" data-variant="info">Assignment engine ready.</div>
+                <div id="assign-loading-indicator" class="hidden items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)]"></span>
+                    <span>Working…</span>
+                </div>
+            </div>
         </div>
     </div>
 

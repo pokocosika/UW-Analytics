@@ -62,28 +62,33 @@ export async function loadPolicies(source = './file-policy.csv') {
     return policyCache;
   }
 
-  const response = await fetch(source, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Unable to load policy data from ${source}`);
+  try {
+    const response = await fetch(source, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Unable to load policy data from ${source}`);
+    }
+
+    const text = await response.text();
+    const rows = parseCsv(text);
+    const normalizedPolicies = rows.map((row) => ({
+      appNo: normalizeAppNo(getRowValue(row, ['appNo', 'application no', 'policy no', 'p1apno'])),
+      customerName: getRowValue(row, ['customerName', 'customer name', 'name', 'p1fnam', 'p1snam', 'ชื่อ - นามสกุล ผอป.']),
+      idCard: getRowValue(row, ['idCard', 'id card', 'citizen id', 'cid']),
+      plan: getRowValue(row, ['plan', 'p1plan']),
+      submissionDate: getRowValue(row, ['submissionDate', 'submission date', 'p1smdt']),
+      workType: getRowValue(row, ['workType', 'work type']),
+      weight: getRowValue(row, ['weight', 'weight', 'p1fyp']) || 0,
+      assignedUW: getRowValue(row, ['assignedUW', 'assigned uw']),
+      batch: getRowValue(row, ['batch', 'batch']),
+      status: getRowValue(row, ['status', 'p1stat']) || 'pending',
+    }));
+
+    policyCache = normalizedPolicies;
+    return policyCache;
+  } catch (error) {
+    policyCache = [];
+    return policyCache;
   }
-
-  const text = await response.text();
-  const rows = parseCsv(text);
-  const normalizedPolicies = rows.map((row) => ({
-    appNo: normalizeAppNo(getRowValue(row, ['appNo', 'application no', 'policy no', 'p1apno'])),
-    customerName: getRowValue(row, ['customerName', 'customer name', 'name', 'p1fnam', 'p1snam', 'ชื่อ - นามสกุล ผอป.']),
-    idCard: getRowValue(row, ['idCard', 'id card', 'citizen id', 'cid']),
-    plan: getRowValue(row, ['plan', 'p1plan']),
-    submissionDate: getRowValue(row, ['submissionDate', 'submission date', 'p1smdt']),
-    workType: getRowValue(row, ['workType', 'work type']),
-    weight: getRowValue(row, ['weight', 'weight', 'p1fyp']) || 0,
-    assignedUW: getRowValue(row, ['assignedUW', 'assigned uw']),
-    batch: getRowValue(row, ['batch', 'batch']),
-    status: getRowValue(row, ['status', 'p1stat']) || 'pending',
-  }));
-
-  policyCache = normalizedPolicies;
-  return policyCache;
 }
 
 export async function searchPolicy(appNo) {
