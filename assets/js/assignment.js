@@ -6,25 +6,32 @@ function createId(prefix) {
 
 export class Assignment {
   constructor(payload = {}) {
+    const now = new Date().toISOString();
     this.assignmentId = payload.assignmentId || createId('ASSIGN');
     this.appNo = payload.appNo || '';
+    this.policyNo = payload.policyNo || payload.appNo || '';
     this.customerName = payload.customerName || '';
+    this.product = payload.product || payload.plan || '';
     this.idCard = payload.idCard || '';
     this.plan = payload.plan || '';
     this.submissionDate = payload.submissionDate || '';
     this.workType = payload.workType || '';
-    this.weight = payload.weight || 0;
+    this.weight = Number(payload.weight) || 0;
     this.assignedUW = payload.assignedUW || '';
+    this.assignedDateTime = payload.assignedDateTime || payload.createdAt || now;
+    this.assignedBy = payload.assignedBy || 'system';
+    this.lastModified = payload.lastModified || payload.updatedAt || this.assignedDateTime;
     this.batch = payload.batch || '';
     this.status = payload.status || 'pending';
-    this.createdAt = payload.createdAt || new Date().toISOString();
-    this.updatedAt = payload.updatedAt || this.createdAt;
+    this.createdAt = payload.createdAt || this.assignedDateTime;
+    this.updatedAt = payload.updatedAt || this.lastModified;
   }
 }
 
 export class AuditLog {
   constructor(payload = {}) {
     this.logId = payload.logId || createId('AUDIT');
+    this.assignmentId = payload.assignmentId || '';
     this.action = payload.action || 'unknown';
     this.appNo = payload.appNo || '';
     this.before = payload.before || null;
@@ -36,10 +43,13 @@ export class AuditLog {
 
 export async function saveAssignment(payload) {
   const assignment = payload instanceof Assignment ? payload : new Assignment(payload);
-  assignment.updatedAt = new Date().toISOString();
+  const now = new Date().toISOString();
+  assignment.updatedAt = now;
+  assignment.lastModified = now;
+  assignment.assignedDateTime = assignment.assignedDateTime || now;
 
   if (!assignment.createdAt) {
-    assignment.createdAt = assignment.updatedAt;
+    assignment.createdAt = assignment.assignedDateTime;
   }
 
   return saveRecord('assignments', assignment);

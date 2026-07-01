@@ -18,44 +18,81 @@ export const DEFAULT_WEIGHT_RULES = {
   APS: 5,
 };
 
-function normalizeAssignment(payload) {
+function normalizeAssignment(payload = {}) {
+  const now = new Date().toISOString();
   return {
     assignmentId: payload.assignmentId || createId('ASSIGN'),
     appNo: payload.appNo || '',
+    policyNo: payload.policyNo || payload.appNo || '',
     customerName: payload.customerName || '',
+    product: payload.product || payload.plan || '',
     idCard: payload.idCard || '',
     plan: payload.plan || '',
     submissionDate: payload.submissionDate || '',
     workType: payload.workType || '',
     weight: Number(payload.weight) || 0,
     assignedUW: payload.assignedUW || '',
+    assignedDateTime: payload.assignedDateTime || payload.createdAt || now,
+    assignedBy: payload.assignedBy || 'system',
+    lastModified: payload.lastModified || payload.updatedAt || payload.createdAt || now,
     batch: payload.batch || '',
     status: payload.status || 'pending',
-    createdAt: payload.createdAt || new Date().toISOString(),
-    updatedAt: payload.updatedAt || payload.createdAt || new Date().toISOString(),
+    createdAt: payload.createdAt || payload.assignedDateTime || now,
+    updatedAt: payload.updatedAt || payload.lastModified || payload.createdAt || now,
   };
+}
+
+async function assertUniqueAssignment(assignment, ignoreAssignmentId = null) {
+  const records = await getAllRecords('assignments');
+  const targetAppNo = String(assignment.appNo || '').trim().toLowerCase();
+  const duplicate = records.find((record) => {
+    if (ignoreAssignmentId && record.assignmentId === ignoreAssignmentId) {
+      return false;
+    }
+
+    return String(record.appNo || '').trim().toLowerCase() === targetAppNo;
+  });
+
+  if (duplicate) {
+    throw new Error(`Duplicate application number ${assignment.appNo} already exists.`);
+  }
 }
 
 export async function createAssignment(payload) {
   const assignment = normalizeAssignment({ ...payload, createdAt: payload.createdAt || new Date().toISOString() });
   assignment.updatedAt = new Date().toISOString();
+  assignment.lastModified = assignment.updatedAt;
+  assignment.assignedDateTime = assignment.assignedDateTime || assignment.createdAt;
+
+  await assertUniqueAssignment(assignment);
+
   const saved = await saveRecord('assignments', assignment);
-  await addAuditLog({ action: 'create', appNo: assignment.appNo, before: null, after: saved, user: 'system' });
+  await addAuditLog({ assignmentId: saved.assignmentId, action: 'create', appNo: assignment.appNo, before: null, after: saved, user: assignment.assignedBy || 'system' });
   return saved;
 }
 
 export async function updateAssignment(payload) {
   const existing = await getRecord('assignments', payload.assignmentId);
-  const updated = normalizeAssignment({ ...existing, ...payload, updatedAt: new Date().toISOString() });
+  if (!existing) {
+    throw new Error('Assignment not found.');
+  }
+
+  const updated = normalizeAssignment({ ...existing, ...payload, updatedAt: new Date().toISOString(), lastModified: new Date().toISOString() });
+  await assertUniqueAssignment(updated, existing.assignmentId);
+
   const saved = await saveRecord('assignments', updated);
-  await addAuditLog({ action: 'edit', appNo: updated.appNo, before: existing, after: saved, user: 'system' });
+  await addAuditLog({ assignmentId: saved.assignmentId, action: 'edit', appNo: updated.appNo, before: existing, after: saved, user: updated.assignedBy || 'system' });
   return saved;
 }
 
 export async function deleteAssignment(id) {
   const existing = await getRecord('assignments', id);
+  if (!existing) {
+    return true;
+  }
+
   await deleteRecord('assignments', id);
-  await addAuditLog({ action: 'delete', appNo: existing?.appNo || '', before: existing, after: null, user: 'system' });
+  await addAuditLog({ assignmentId: existing.assignmentId, action: 'delete', appNo: existing?.appNo || '', before: existing, after: null, user: existing.assignedBy || 'system' });
   return true;
 }
 
@@ -70,7 +107,7 @@ export async function searchAssignment(query) {
   if (!term) return assignments;
 
   return assignments.filter((assignment) => {
-    const haystack = [assignment.appNo, assignment.customerName, assignment.plan, assignment.assignedUW, assignment.batch, assignment.status]
+    const haystack = [assignment.appNo, assignment.policyNo, assignment.customerName, assignment.product, assignment.plan, assignment.assignedUW, assignment.batch, assignment.status, assignment.assignedBy]
       .join(' ')
       .toLowerCase();
     return haystack.includes(term);

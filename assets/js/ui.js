@@ -226,12 +226,21 @@ function renderHistory(assignments) {
   listNode.innerHTML = assignments.map((assignment) => `
     <tr class="border-b border-[var(--border)] text-xs text-[var(--text-muted)]">
       <td class="p-3 text-white">${assignment.appNo || '—'}</td>
-      <td class="p-3">${assignment.customerName || '—'}</td>
+      <td class="p-3">
+        <div class="font-medium text-white">${assignment.customerName || '—'}</div>
+        ${assignment.policyNo || assignment.product ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">${[assignment.policyNo ? `Policy No: ${assignment.policyNo}` : '', assignment.product ? `Product: ${assignment.product}` : ''].filter(Boolean).join(' • ')}</div>` : ''}
+      </td>
       <td class="p-3">${assignment.workType || '—'}</td>
       <td class="p-3">${assignment.weight || 0}</td>
-      <td class="p-3">${assignment.assignedUW || '—'}</td>
+      <td class="p-3">
+        <div>${assignment.assignedUW || '—'}</div>
+        ${assignment.assignedBy ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">By ${assignment.assignedBy}</div>` : ''}
+      </td>
       <td class="p-3">${assignment.batch || '—'}</td>
-      <td class="p-3">${assignment.status || 'pending'}</td>
+      <td class="p-3">
+        <div>${assignment.status || 'pending'}</div>
+        ${assignment.lastModified ? `<div class="mt-1 text-[10px] text-[var(--text-muted)]">${new Date(assignment.lastModified).toLocaleString()}</div>` : ''}
+      </td>
       <td class="p-3 flex gap-2">
         <button data-action="edit" data-id="${assignment.assignmentId}" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[11px] text-white">Edit</button>
         <button data-action="delete" data-id="${assignment.assignmentId}" class="rounded-lg border border-rose-500/40 px-2 py-1 text-[11px] text-rose-300">Delete</button>
@@ -366,8 +375,14 @@ export function setupAssignTab() {
         return;
       }
 
+      const now = new Date().toISOString();
       const payload = {
         ...values,
+        policyNo: values.policyNo || values.appNo || '',
+        product: values.product || values.plan || '',
+        assignedDateTime: values.assignedDateTime || (activeAssignmentId ? undefined : now),
+        assignedBy: values.assignedBy || 'system',
+        lastModified: now,
         weight: Number(values.weight) || validation.calculatedWeight || 0,
         assignmentId: activeAssignmentId || undefined,
       };
@@ -378,7 +393,7 @@ export function setupAssignTab() {
           updateAssignStatus(validation.reason || 'Assignment updated.', validation.status === 'warning' ? 'warning' : 'success');
         } else {
           await createAssignment(payload);
-          updateAssignStatus(validation.reason || 'Assignment saved to IndexedDB.', validation.status === 'warning' ? 'warning' : 'success');
+          updateAssignStatus(validation.reason || 'Assignment saved to LocalStorage.', validation.status === 'warning' ? 'warning' : 'success');
         }
         activeAssignmentId = null;
         form.reset();

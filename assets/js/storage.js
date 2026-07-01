@@ -3,130 +3,123 @@ const DB_VERSION = 1;
 
 const STORE_NAMES = ['assignments', 'auditLogs', 'settings', 'businessRules', 'capacity'];
 
-function openDatabase() {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available in this environment.'));
-      return;
+function createStorageKey(storeName) {
+  return `uw-analytics:${storeName}`;
+}
+
+function createRecordId(prefix = 'record') {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readStore(storeName) {
+  if (typeof localStorage === 'undefined') {
+    return [];
+  }
+
+  try {
+    const rawValue = localStorage.getItem(createStorageKey(storeName));
+    if (!rawValue) {
+      return [];
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn(`Unable to read ${storeName} from LocalStorage.`, error);
+    return [];
+  }
+}
 
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      STORE_NAMES.forEach((storeName) => {
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
-        }
-      });
-    };
+function writeStore(storeName, records) {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('Unable to open database.'));
+  localStorage.setItem(createStorageKey(storeName), JSON.stringify(records));
+}
+
+function findRecord(items, id) {
+  return items.find((item) => {
+    if (!id) {
+      return false;
+    }
+
+    if (item.id === id) {
+      return true;
+    }
+
+    if (item.assignmentId && item.assignmentId === id) {
+      return true;
+    }
+
+    if (item.logId && item.logId === id) {
+      return true;
+    }
+
+    if (item.key && item.key === id) {
+      return true;
+    }
+
+    return false;
   });
 }
 
 export async function initializeStorage() {
-  const db = await openDatabase();
-  db.close();
+  if (typeof localStorage === 'undefined') {
+    throw new Error('LocalStorage is not available in this environment.');
+  }
+
+  STORE_NAMES.forEach((storeName) => {
+    if (!readStore(storeName).length) {
+      writeStore(storeName, []);
+    }
+  });
+
   return true;
 }
 
 export async function saveRecord(storeName, record) {
-  const db = await openDatabase();
-  const tx = db.transaction(storeName, 'readwrite');
-  const store = tx.objectStore(storeName);
-  const key = record.id || record.assignmentId || record.logId || record.key;
-
+  const normalizedStoreName = String(storeName || '').trim();
   const payload = { ...record };
-  if (key) {
-    payload.id = key;
+  const key = payload.id || payload.assignmentId || payload.logId || payload.key || null;
+
+  if (!payload.id) {
+    payload.id = key || createRecordId(normalizedStoreName || 'record');
   }
 
-  const request = store.put(payload);
+  const items = readStore(normalizedStoreName);
+  const existingIndex = items.findIndex((item) => item.id === payload.id);
 
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => {
-      resolve({ ...payload, id: request.result });
-      db.close();
-    };
-    request.onerror = () => {
-      reject(request.error || new Error(`Unable to save record in ${storeName}.`));
-      db.close();
-    };
-  });
+  if (existingIndex >= 0) {
+    items[existingIndex] = payload;
+  } else {
+    items.push(payload);
+  }
+
+  writeStore(normalizedStoreName, items);
+  return payload;
 }
 
 export async function getAllRecords(storeName) {
-  const db = await openDatabase();
-  const tx = db.transaction(storeName, 'readonly');
-  const store = tx.objectStore(storeName);
-
-  return new Promise((resolve, reject) => {
-    const request = store.getAll();
-    request.onsuccess = () => {
-      resolve(request.result || []);
-      db.close();
-    };
-    request.onerror = () => {
-      reject(request.error || new Error(`Unable to read records from ${storeName}.`));
-      db.close();
-    };
-  });
+  return readStore(String(storeName || '').trim());
 }
 
 export async function getRecord(storeName, id) {
-  const db = await openDatabase();
-  const tx = db.transaction(storeName, 'readonly');
-  const store = tx.objectStore(storeName);
-
-  return new Promise((resolve, reject) => {
-    const request = store.get(id);
-    request.onsuccess = () => {
-      resolve(request.result || null);
-      db.close();
-    };
-    request.onerror = () => {
-      reject(request.error || new Error(`Unable to read record ${id} from ${storeName}.`));
-      db.close();
-    };
-  });
+  const items = readStore(String(storeName || '').trim());
+  return findRecord(items, id) || null;
 }
 
 export async function clearStore(storeName) {
-  const db = await openDatabase();
-  const tx = db.transaction(storeName, 'readwrite');
-  const store = tx.objectStore(storeName);
-
-  return new Promise((resolve, reject) => {
-    const request = store.clear();
-    request.onsuccess = () => {
-      resolve(true);
-      db.close();
-    };
-    request.onerror = () => {
-      reject(request.error || new Error(`Unable to clear ${storeName}.`));
-      db.close();
-    };
-  });
+  writeStore(String(storeName || '').trim(), []);
+  return true;
 }
 
 export async function deleteRecord(storeName, id) {
-  const db = await openDatabase();
-  const tx = db.transaction(storeName, 'readwrite');
-  const store = tx.objectStore(storeName);
-
-  return new Promise((resolve, reject) => {
-    const request = store.delete(id);
-    request.onsuccess = () => {
-      resolve(true);
-      db.close();
-    };
-    request.onerror = () => {
-      reject(request.error || new Error(`Unable to delete record ${id} from ${storeName}.`));
-      db.close();
-    };
-  });
+  const normalizedStoreName = String(storeName || '').trim();
+  const items = readStore(normalizedStoreName);
+  const nextItems = items.filter((item) => !findRecord([item], id));
+  writeStore(normalizedStoreName, nextItems);
+  return true;
 }
 
 export { DB_NAME, DB_VERSION, STORE_NAMES };
