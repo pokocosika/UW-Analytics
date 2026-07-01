@@ -931,22 +931,22 @@ input, select, button {
         <div id="stats-grid" class="stats-grid">
             <div class="stat-card c1">
                 <div class="stat-glow"></div>
-                <div class="stat-label">จำนวนเคสทั้งหมด</div>
+                <div class="stat-label">จำนวน Assignment ทั้งหมด</div>
                 <div id="stat-total-count" class="stat-value">0</div>
             </div>
             <div class="stat-card c2">
                 <div class="stat-glow"></div>
-                <div class="stat-label">เบี้ยประกันรวม (FYP)</div>
+                <div class="stat-label">น้ำหนักที่มอบหมายรวม</div>
                 <div id="stat-total-fyp" class="stat-value">0.00</div>
             </div>
             <div class="stat-card c3">
                 <div class="stat-glow"></div>
-                <div class="stat-label">เคสที่อนุมัติแล้ว (I)</div>
+                <div class="stat-label">Assignment วันนี้</div>
                 <div id="stat-approved-count" class="stat-value">0</div>
             </div>
             <div class="stat-card c4">
                 <div class="stat-glow"></div>
-                <div class="stat-label">เคสที่ติด Pending (G)</div>
+                <div class="stat-label">Pending Queue</div>
                 <div id="stat-pending-count" class="stat-value">0</div>
             </div>
         </div>
@@ -987,8 +987,70 @@ input, select, button {
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label>LOS เกินกว่า (วัน)</label>
-                    <input type="number" id="f-los" oninput="applyFilters()" placeholder="ระบุจำนวนวัน..." min="0">
+                    <label>น้ำหนักขั้นต่ำ (Weight)</label>
+                    <input type="number" id="f-los" oninput="applyFilters()" placeholder="ระบุน้ำหนัก..." min="0">
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+            <div class="card table-card">
+                <div class="filter-title mb-3">Pending Queue</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>App No.</th>
+                                <th>Customer</th>
+                                <th>UW</th>
+                                <th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingQueueBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card table-card">
+                <div class="filter-title mb-3">Assigned Queue</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>App No.</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>UW</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assignedQueueBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+            <div class="card table-card">
+                <div class="filter-title mb-3">Workload Summary</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>UW</th>
+                                <th>Capacity</th>
+                                <th>Assigned</th>
+                                <th>Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workloadSummaryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card table-card">
+                <div class="filter-title mb-3">Capacity Status</div>
+                <div id="capacityStatusBody" class="space-y-2"></div>
+                <div class="mt-4">
+                    <div class="filter-title mb-3">Today's Assignment</div>
+                    <div id="todayAssignmentsBody" class="space-y-2"></div>
                 </div>
             </div>
         </div>
@@ -1000,12 +1062,12 @@ input, select, button {
                         <tr>
                             <th>App No.</th>
                             <th>ชื่อ-นามสกุล</th>
-                            <th style="text-align:center">อายุ</th>
-                            <th>แบบประกัน</th>
+                            <th>Product</th>
+                            <th>Assigned UW</th>
                             <th>Status</th>
-                            <th style="text-align:right">เบี้ยประกัน (FYP)</th>
-                            <th style="text-align:center">Submission Date</th>
-                            <th style="text-align:center">LOS (วัน)</th>
+                            <th style="text-align:right">Weight</th>
+                            <th style="text-align:center">Assigned Date</th>
+                            <th style="text-align:center">Last Modified</th>
                         </tr>
                     </thead>
                     <tbody id="policyTableBody"></tbody>
@@ -1418,28 +1480,150 @@ function switchTab(tabId) {
             return diffDays >= 0 ? diffDays : 0;
         }
 
+        let dashboardAssignments = [];
+
+        function renderQueueRows(containerId, assignments, statusFilter) {
+            const tbody = document.getElementById(containerId);
+            if (!tbody) return;
+
+            const filtered = assignments.filter((assignment) => {
+                if (!statusFilter) return true;
+                return String(assignment.status || '').toLowerCase() === String(statusFilter).toLowerCase();
+            });
+
+            if (!filtered.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-[var(--text-muted)]">No data</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.slice(0, 8).map((assignment) => `
+                <tr>
+                    <td class="p-2">${assignment.appNo || '—'}</td>
+                    <td class="p-2">${assignment.customerName || '—'}</td>
+                    <td class="p-2">${assignment.assignedUW || '—'}</td>
+                    <td class="p-2">${assignment.weight || 0}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderWorkloadSummary(assignments) {
+            const tbody = document.getElementById('workloadSummaryBody');
+            if (!tbody) return;
+
+            const summary = [];
+            const seen = new Set();
+            assignments.forEach((assignment) => {
+                const uw = String(assignment.assignedUW || '').trim().toUpperCase();
+                if (!uw) return;
+                if (!seen.has(uw)) {
+                    seen.add(uw);
+                    summary.push({ uw, capacity: 10, assigned: 0 });
+                }
+            });
+
+            summary.forEach((entry) => {
+                entry.assigned = assignments.filter((assignment) => String(assignment.assignedUW || '').trim().toUpperCase() === entry.uw).reduce((sum, assignment) => sum + Number(assignment.weight || 0), 0);
+                entry.remaining = Math.max(entry.capacity - entry.assigned, 0);
+                entry.status = entry.remaining <= 0 ? 'Full' : entry.remaining < 3 ? 'Busy' : 'Normal';
+            });
+
+            if (!summary.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-[var(--text-muted)]">No workload data</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = summary.map((entry) => `
+                <tr>
+                    <td class="p-2">${entry.uw}</td>
+                    <td class="p-2">${entry.capacity}</td>
+                    <td class="p-2">${entry.assigned}</td>
+                    <td class="p-2">${entry.remaining}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderCapacityStatus(assignments) {
+            const container = document.getElementById('capacityStatusBody');
+            if (!container) return;
+
+            const rows = [];
+            const grouped = {};
+            assignments.forEach((assignment) => {
+                const uw = String(assignment.assignedUW || '').trim().toUpperCase();
+                if (!uw) return;
+                grouped[uw] = (grouped[uw] || 0) + Number(assignment.weight || 0);
+            });
+
+            Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).forEach(([uw, weight]) => {
+                const status = weight >= 10 ? 'Over Capacity' : weight >= 7 ? 'Near Limit' : 'Available';
+                rows.push(`
+                    <div class="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-sm">
+                        <div class="flex items-center justify-between text-white">
+                            <span>${uw}</span>
+                            <span class="text-[var(--text-muted)]">${weight}/10</span>
+                        </div>
+                        <div class="mt-2 h-2 rounded-full bg-[var(--surface)]">
+                            <div class="h-2 rounded-full bg-[var(--accent)]" style="width:${Math.min(100, (weight / 10) * 100)}%"></div>
+                        </div>
+                        <div class="mt-2 text-xs text-[var(--text-muted)]">${status}</div>
+                    </div>
+                `);
+            });
+
+            container.innerHTML = rows.length ? rows.join('') : '<div class="text-sm text-[var(--text-muted)]">No assigned UW data</div>';
+        }
+
+        function renderTodayAssignments(assignments) {
+            const container = document.getElementById('todayAssignmentsBody');
+            if (!container) return;
+
+            const today = new Date().toISOString().slice(0, 10);
+            const todays = assignments.filter((assignment) => String(assignment.assignedDateTime || '').slice(0, 10) === today);
+
+            if (!todays.length) {
+                container.innerHTML = '<div class="text-sm text-[var(--text-muted)]">No assignments created today</div>';
+                return;
+            }
+
+            container.innerHTML = todays.slice(0, 5).map((assignment) => `
+                <div class="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-sm">
+                    <div class="flex items-center justify-between text-white">
+                        <span>${assignment.appNo || '—'}</span>
+                        <span class="text-[var(--text-muted)]">${assignment.assignedUW || '—'}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-[var(--text-muted)]">${assignment.customerName || '—'} • ${assignment.status || 'pending'}</div>
+                </div>
+            `).join('');
+        }
+
         function updateDashboard(data) {
             renderTable(data);
             updateStats(data);
             renderCharts(data);
+            renderQueueRows('pendingQueueBody', data, 'pending');
+            renderQueueRows('assignedQueueBody', data, 'in-progress');
+            renderWorkloadSummary(data);
+            renderCapacityStatus(data);
+            renderTodayAssignments(data);
             playFadeUpdate('stats-grid', 'dashboard-charts-grid', 'dashboard-table-card');
         }
 
         function updateStats(data) {
             document.getElementById('stat-total-count').innerText = data.length.toLocaleString();
             
-            let totalFyp = 0;
-            let approvedCount = 0;
+            let totalWeight = 0;
+            let todayCount = 0;
             let pendingCount = 0;
 
-            data.forEach(item => {
-                totalFyp += (Number(item.P1FYP) || 0);
-                if (item.P1STAT === 'I') approvedCount++;
-                if (item.P1STAT === 'G') pendingCount++;
+            const today = new Date().toISOString().slice(0, 10);
+            data.forEach((item) => {
+                totalWeight += Number(item.weight || 0);
+                if (String(item.assignedDateTime || '').slice(0, 10) === today) todayCount++;
+                if (String(item.status || '').toLowerCase() === 'pending') pendingCount++;
             });
 
-            document.getElementById('stat-total-fyp').innerText = totalFyp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            document.getElementById('stat-approved-count').innerText = approvedCount.toLocaleString();
+            document.getElementById('stat-total-fyp').innerText = totalWeight.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('stat-approved-count').innerText = todayCount.toLocaleString();
             document.getElementById('stat-pending-count').innerText = pendingCount.toLocaleString();
         }
 
@@ -1457,48 +1641,21 @@ function switchTab(tabId) {
             const rowsHtml = [];
 
             data.forEach(item => {
-                const appNo = formatAppNo(item.P1APNO);
-                const hasPending = !!pendingDetailMap[appNo];
-                const los = calculateLOS(item.P1SMDT, item.P1STAT, item.P1APNO);
-                
-                let losClass = 'los-ok';
-                if (los >= 15) losClass = 'los-danger';
-                else if (los >= 7) losClass = 'los-warn';
-
-                const statusLabel = statusNames[item.P1STAT] || item.P1STAT || '-';
-                const isPendingStatus = item.P1STAT === 'G';
-
-                let badgeClass = 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
-                let iconStr = '';
-
-                if (isPendingStatus) {
-                    badgeClass = hasPending 
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 clickable'
-                        : 'bg-amber-500/10 text-amber-500/60 border border-amber-500/20 clickable';
-                    iconStr = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-left:4px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`;
-                } else if (item.P1STAT === 'I') {
-                    badgeClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-                } else if (['D','P','N','W'].includes(item.P1STAT)) {
-                    badgeClass = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
-                }
-
-                const clickAttr = isPendingStatus ? `onclick="showPendingDetail('${appNo}')"` : '';
-                const losValue = item.P1STAT === 'I' ? '-' : los;
+                const appNo = String(item.appNo || '').trim();
+                const statusLabel = String(item.status || 'pending').replace(/-/g, ' ');
+                const assignedAt = item.assignedDateTime ? new Date(item.assignedDateTime).toLocaleDateString('th-TH') : '-';
+                const updatedAt = item.lastModified ? new Date(item.lastModified).toLocaleDateString('th-TH') : '-';
 
                 rowsHtml.push(`
                     <tr>
                         <td class="app-no">${appNo}</td>
-                        <td>${item.P1FNAM || ''} ${item.P1SNAM || ''}</td>
-                        <td style="text-align:center">${item.P1AGE || '-'}</td>
-                        <td><span class="plan-tag">${item.P1PLAN || '-'}</span></td>
-                        <td>
-                            <span class="status-badge ${badgeClass}" ${clickAttr}>
-                                ${statusLabel} ${iconStr}
-                            </span>
-                        </td>
-                        <td class="fyp-val" style="text-align:right">${(Number(item.P1FYP) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td class="date-val" style="text-align:center">${formatDate(item.P1SMDT)}</td>
-                        <td class="los-val ${losClass}" style="text-align:center">${losValue} <span style="font-size:11px;font-weight:400;opacity:0.7">วัน</span></td>
+                        <td>${item.customerName || '-'}</td>
+                        <td>${item.product || item.plan || '-'}</td>
+                        <td>${item.assignedUW || '-'}</td>
+                        <td><span class="status-badge bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">${statusLabel}</span></td>
+                        <td class="fyp-val" style="text-align:right">${(Number(item.weight) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td class="date-val" style="text-align:center">${assignedAt}</td>
+                        <td class="date-val" style="text-align:center">${updatedAt}</td>
                     </tr>
                 `);
             });
@@ -1528,7 +1685,7 @@ function switchTab(tabId) {
 
             const statusCounts = {};
             data.forEach(item => {
-                const label = statusNames[item.P1STAT] || item.P1STAT || 'อื่นๆ';
+                const label = String(item.status || 'pending').replace(/-/g, ' ');
                 statusCounts[label] = (statusCounts[label] || 0) + 1;
             });
 
@@ -1553,14 +1710,13 @@ function switchTab(tabId) {
                 }
             });
 
-            const planFyp = {};
+            const productWeight = {};
             data.forEach(item => {
-                if (item.P1PLAN) {
-                    planFyp[item.P1PLAN] = (planFyp[item.P1PLAN] || 0) + (Number(item.P1FYP) || 0);
-                }
+                const label = item.product || item.plan || 'Unknown';
+                productWeight[label] = (productWeight[label] || 0) + Number(item.weight || 0);
             });
 
-            const topPlans = Object.entries(planFyp)
+            const topPlans = Object.entries(productWeight)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 5);
 
@@ -1571,7 +1727,7 @@ function switchTab(tabId) {
                 data: {
                     labels: topPlans.map(x => x[0]),
                     datasets: [{
-                        label: 'เบี้ยประกันรวม (FYP)',
+                        label: 'Assigned Weight',
                         data: topPlans.map(x => x[1]),
                         backgroundColor: 'rgba(255,140,0,0.75)',
                         hoverBackgroundColor: '#ff8c00',
@@ -1595,37 +1751,32 @@ function switchTab(tabId) {
             const fFnam = document.getElementById('f-name').value.trim().toLowerCase();
             const fPlan = document.getElementById('f-plan').value.trim().toLowerCase();
             const fStat = document.getElementById('f-stat').value;
-            const fLos = document.getElementById('f-los').value;
+            const fWeight = document.getElementById('f-los').value;
 
-            const filtered = policyData.filter(item => {
-                const appNoStr = formatAppNo(item.P1APNO);
+            const filtered = dashboardAssignments.filter(item => {
+                const appNoStr = String(item.appNo || '').trim().toLowerCase();
                 const matchApp = appNoStr.includes(fApp);
-                const fullName = String((item.P1FNAM || '') + ' ' + (item.P1SNAM || '')).toLowerCase();
+                const fullName = String(item.customerName || '').toLowerCase();
                 const matchName = fullName.includes(fFnam);
-                const matchPlan = String(item.P1PLAN || '').toLowerCase().includes(fPlan);
-                const matchStat = !fStat || item.P1STAT === fStat;
-                
-                let matchLos = true;
-                if (fLos) {
-                    const currentLos = calculateLOS(item.P1SMDT, item.P1STAT, item.P1APNO);
-                    matchLos = (item.P1STAT !== 'I' && currentLos >= parseInt(fLos));
-                }
+                const matchPlan = String(item.product || item.plan || '').toLowerCase().includes(fPlan);
+                const matchStat = !fStat || String(item.status || '').toLowerCase() === String(fStat).toLowerCase();
+                const matchWeight = !fWeight || Number(item.weight || 0) >= Number(fWeight);
 
-                return matchApp && matchName && matchPlan && matchStat && matchLos;
+                return matchApp && matchName && matchPlan && matchStat && matchWeight;
             });
 
             updateDashboard(filtered);
         }
 
         function populateStatusFilter() {
-            const stats = [...new Set(policyData.map(item => item.P1STAT))].sort();
+            const stats = [...new Set(dashboardAssignments.map(item => String(item.status || 'pending')))].sort();
             const select = document.getElementById('f-stat');
             select.innerHTML = '<option value="">— ทั้งหมด —</option>';
             stats.forEach(st => {
                 if (st) {
                     const option = document.createElement('option');
                     option.value = st;
-                    option.text = statusNames[st] || st;
+                    option.text = st;
                     select.add(option);
                 }
             });
@@ -1637,7 +1788,7 @@ function switchTab(tabId) {
             document.getElementById('f-plan').value = '';
             document.getElementById('f-stat').value = '';
             document.getElementById('f-los').value = '';
-            updateDashboard(policyData);
+            updateDashboard(dashboardAssignments);
         }
 
        // ==================== OPERATIONAL ENGINE: ORIGINAL TRACKING ====================
@@ -2059,37 +2210,20 @@ function setDashboardStatus(msg, color) {
 async function refreshDashboardData() {
     const btn = document.getElementById('btn-refresh-dashboard');
     setButtonLoading(btn, true);
-    setDashboardStatus('กำลังดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์...', 'var(--text-muted)');
+    setDashboardStatus('กำลังโหลด Assignment จาก LocalStorage...', 'var(--text-muted)');
 
     try {
-        const [policyJson, pendingJson] = await Promise.all([
-            loadPolicyCsv(),
-            loadPendingCsv().catch(err => { console.error('Pending CSV error:', err); return []; })
-        ]);
-
-        if (policyJson.length === 0) {
-            throw new Error('ไม่พบข้อมูลกรมธรรม์ในไฟล์ Policy');
-        }
-
-        policyData = policyJson;
+        const assignments = await window.__assignmentStorage?.getAssignments?.() || [];
+        dashboardAssignments = Array.isArray(assignments) ? assignments : [];
+        policyData = dashboardAssignments;
         populateStatusFilter();
-
-        let pendingNote = '';
-        try {
-            const pendingCount = applyPendingJson(pendingJson);
-            if (pendingCount > 0) pendingNote = ` · Pending: ${pendingCount.toLocaleString()} รายการ`;
-        } catch (pendingErr) {
-            console.warn('Pending data skipped:', pendingErr.message);
-            pendingNote = ' · Pending: ข้ามไป (รูปแบบไฟล์ไม่ตรง)';
-        }
-
-        updateDashboard(policyData);
+        updateDashboard(dashboardAssignments);
 
         const now = new Date().toLocaleTimeString('th-TH');
-        setDashboardStatus(`✓ อัปเดตล่าสุดเมื่อ ${now} น. · Policy: ${policyData.length.toLocaleString()} รายการ${pendingNote}`, '#34d399');
+        setDashboardStatus(`✓ อัปเดตล่าสุดเมื่อ ${now} น. · Assignment: ${dashboardAssignments.length.toLocaleString()} รายการ`, '#34d399');
     } catch (err) {
         console.error(err);
-        setDashboardStatus('✕ ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง', '#f87171');
+        setDashboardStatus('✕ ไม่สามารถโหลด Assignment จาก LocalStorage ได้', '#f87171');
     } finally {
         setButtonLoading(btn, false);
     }

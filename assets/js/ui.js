@@ -404,6 +404,7 @@ export function setupAssignTab() {
           weightInput.value = calculateWeight(workTypeSelect.value);
         }
         await refreshHistory();
+        window.refreshDashboardData?.();
       } catch (error) {
         updateAssignStatus(error.message || 'Unable to save assignment.', 'error');
       }
@@ -451,6 +452,7 @@ export function setupAssignTab() {
       await deleteAssignment(assignmentId);
       updateAssignStatus('Assignment deleted.', 'warning');
       await refreshHistory();
+      window.refreshDashboardData?.();
       return;
     }
 
@@ -475,5 +477,6 @@ export async function initializeAssignmentUi() {
   setupAssignTab();
   await refreshHistory();
   await refreshBusinessRuleStatus();
+  window.refreshDashboardData?.();
   updateAssignStatus('Assignment engine ready.', 'success');
 }
